@@ -9,6 +9,7 @@ import { setupSwagger } from "./swagger.js";
 
 import multer from "multer";
 import path from "path";
+import { limiter } from "./middleware/rateLimiter.js";
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ const storage = multer.diskStorage({
 export const upload = multer({ storage });
 
 app.use(cors());
+app.use(limiter);
 app.use(express.json());
 
 // Static files uchun — uploads papkasi ochiq bo‘lsin

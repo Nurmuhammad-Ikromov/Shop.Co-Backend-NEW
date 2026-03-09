@@ -14,6 +14,10 @@ const options = {
         url: "http://localhost:5000",
         description: "Local server",
       },
+      {
+        url: "https://shop-co-backend-new.onrender.com",
+        description: "Production server",
+      },
     ],
     components: {
       securitySchemes: {
@@ -204,7 +208,7 @@ const options = {
             404: { description: "Topilmadi" },
           },
         },
-        put: {
+        patch: {
           tags: ["Products"],
           summary: "Mahsulotni yangilash — faqat admin",
           security: [{ bearerAuth: [] }],
@@ -212,7 +216,18 @@ const options = {
           requestBody: {
             content: {
               "application/json": {
-                schema: { $ref: "#/components/schemas/Product" },
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", example: "Polo Shirt" },
+                    price: { type: "number", example: 29.99 },
+                    category: { type: "string", example: "men" },
+                    type: { type: "string", example: "shirt" },
+                    colors: { type: "array", items: { type: "string" }, example: ["red", "blue"] },
+                    size: { type: "array", items: { type: "string" }, example: ["S", "M", "L"] },
+                    images: { type: "array", items: { type: "string" }, example: ["https://res.cloudinary.com/..."] },
+                  },
+                },
               },
             },
           },

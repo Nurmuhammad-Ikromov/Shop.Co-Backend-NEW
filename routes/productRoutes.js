@@ -21,7 +21,7 @@ router.get("/:id", getProductById);
 
 // ⚠️ Faqat adminlar yaratishi mumkin
 router.post("/", protect, isAdmin, createProduct);
-router.put("/:id", protect, isAdmin, updateProduct);
+router.patch("/:id", protect, isAdmin, updateProduct);
 router.delete("/:id", protect, isAdmin, deleteProduct);
 
 router.post("/:id/comments", protect, addCommentToProduct);
