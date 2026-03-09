@@ -5,6 +5,7 @@ import cors from "cors";
 import productRoutes from "./routes/productRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import typeRoutes from "./routes/typeRoutes.js";
+import { setupSwagger } from "./swagger.js";
 
 import multer from "multer";
 import path from "path";
@@ -40,6 +41,8 @@ app.use("/uploads", express.static("uploads"));
 app.use("/api/products", productRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/types", typeRoutes);
+
+setupSwagger(app);
 
 const PORT = process.env.PORT || 5000;
 
