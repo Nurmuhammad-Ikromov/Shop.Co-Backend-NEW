@@ -1,12 +1,61 @@
 import Product from "../models/Product.js";
 import { cloudinary } from "../middleware/upload.js";
 
+function parseArrayField(value) {
+  if (Array.isArray(value)) return value;
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function buildProductPayload(body, extra = {}) {
+  const payload = { ...body, ...extra };
+
+  if (payload.name !== undefined && payload.title === undefined) {
+    payload.title = payload.name;
+  } else if (payload.title !== undefined && payload.name === undefined) {
+    payload.name = payload.title;
+  }
+
+  if (payload.colors !== undefined) {
+    payload.colors = parseArrayField(payload.colors);
+  }
+
+  if (payload.size !== undefined) {
+    payload.size = parseArrayField(payload.size);
+  }
+
+  return payload;
+}
+
+function normalizeProductName(payload) {
+  const rawName = payload.name ?? payload.title;
+
+  if (rawName === undefined) return null;
+
+  const normalizedName =
+    typeof rawName === "string" ? rawName.trim() : rawName;
+
+  if (!normalizedName) return null;
+
+  payload.name = normalizedName;
+  payload.title = normalizedName;
+
+  return normalizedName;
+}
+
 // --- 1. Barcha productlarni filtr bilan olish ---
 export async function getAllProducts(req, res) {
   try {
     const { type, category, minPrice, maxPrice, colors, size } = req.query;
 
-    let filter = {};
+    const filter = {};
 
     if (type) {
       const types = type.split(",");
@@ -37,7 +86,7 @@ export async function getAllProducts(req, res) {
   }
 }
 
-// --- 2. ID bo‘yicha product olish ---
+// --- 2. ID bo'yicha product olish ---
 export async function getProductById(req, res) {
   try {
     const product = await Product.findById(req.params.id);
@@ -48,10 +97,17 @@ export async function getProductById(req, res) {
   }
 }
 
-// --- 3. Yangi product yaratish (faqat ma'lumotlar bilan, rasm yo‘q) ---
+// --- 3. Yangi product yaratish (faqat ma'lumotlar bilan, rasm yo'q) ---
 export async function createProduct(req, res) {
   try {
-    const newProduct = new Product(req.body);
+    const productData = buildProductPayload(req.body);
+    const name = normalizeProductName(productData);
+
+    if (!name) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
+
+    const newProduct = new Product(productData);
     await newProduct.save();
     res.status(201).json(newProduct);
   } catch (err) {
@@ -62,8 +118,22 @@ export async function createProduct(req, res) {
 // --- 4. Productni yangilash ---
 export async function updateProduct(req, res) {
   try {
-    const updated = await Product.findByIdAndUpdate(req.params.id, req.body, {
+    const productData = buildProductPayload(req.body);
+
+    if (
+      Object.prototype.hasOwnProperty.call(productData, "title") ||
+      Object.prototype.hasOwnProperty.call(productData, "name")
+    ) {
+      const name = normalizeProductName(productData);
+
+      if (!name) {
+        return res.status(400).json({ message: "Product name is required" });
+      }
+    }
+
+    const updated = await Product.findByIdAndUpdate(req.params.id, productData, {
       new: true,
+      runValidators: true,
     });
     if (!updated) return res.status(404).json({ message: "Not found" });
     res.json(updated);
@@ -72,14 +142,14 @@ export async function updateProduct(req, res) {
   }
 }
 
-// --- 5. Productni o‘chirish ---
+// --- 5. Productni o'chirish ---
 export async function deleteProduct(req, res) {
   try {
     const product = await Product.findById(req.params.id);
     if (!product)
       return res.status(404).json({ message: "Mahsulot topilmadi" });
 
-    // Rasmlarni Cloudinary dan o’chirish
+    // Rasmlarni Cloudinary dan o'chirish
     if (product.images && Array.isArray(product.images)) {
       for (const imageUrl of product.images) {
         try {
@@ -90,20 +160,20 @@ export async function deleteProduct(req, res) {
           const publicId = `${folder}/${filename}`;
           await cloudinary.uploader.destroy(publicId);
         } catch (err) {
-          console.error("Cloudinary rasm o’chirishda xatolik:", err.message);
+          console.error("Cloudinary rasm o'chirishda xatolik:", err.message);
         }
       }
     }
 
     await Product.findByIdAndDelete(req.params.id);
 
-    res.json({ message: "Mahsulot va rasm o‘chirildi" });
+    res.json({ message: "Mahsulot va rasm o'chirildi" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 }
 
-// --- 6. Productga comment qo‘shish ---
+// --- 6. Productga comment qo'shish ---
 export async function addCommentToProduct(req, res) {
   try {
     const { id } = req.params;
@@ -141,7 +211,7 @@ export const uploadImage = (req, res) => {
 // --- 8. Yangi product yaratish (multer bilan rasm + ma'lumot birga) ---
 export async function createProductWithImages(req, res) {
   try {
-    // Fayl yuklanmagan bo‘lsa
+    // Fayl yuklanmagan bo'lsa
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: "Rasmlar yuklanmagan" });
     }
@@ -149,13 +219,15 @@ export async function createProductWithImages(req, res) {
     // Cloudinary URL larini olish
     const imageUrls = req.files.map((file) => file.path);
 
-    // Product ma'lumotlarini yig‘ish
-    const productData = {
-      ...req.body,
-      images: imageUrls, // array ko‘rinishida
-      colors: req.body.colors ? req.body.colors.split(",") : [],
-      size: req.body.size ? req.body.size.split(",") : [],
-    };
+    // Product ma'lumotlarini yig'ish
+    const productData = buildProductPayload(req.body, {
+      images: imageUrls,
+    });
+    const name = normalizeProductName(productData);
+
+    if (!name) {
+      return res.status(400).json({ message: "Product name is required" });
+    }
 
     const newProduct = new Product(productData);
     await newProduct.save();

@@ -14,6 +14,7 @@ import { limiter } from "./middleware/rateLimiter.js";
 dotenv.config();
 
 const app = express();
+const mongoUri = process.env.MONGO_URI?.trim();
 
 // --- Multer sozlash ---
 // uploads papkasi va fayl nomini sozlaymiz
@@ -48,9 +49,34 @@ setupSwagger(app);
 
 const PORT = process.env.PORT || 5000;
 
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() =>
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`))
-  )
-  .catch((err) => console.log(err));
+async function startServer() {
+  if (!mongoUri) {
+    console.error("MONGO_URI is missing in .env");
+    process.exit(1);
+  }
+
+  try {
+    await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000,
+      family: 4,
+    });
+
+    console.log("MongoDB connected");
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  } catch (err) {
+    console.error("MongoDB connection failed.");
+    console.error(err.message);
+
+    const serverErrors = err?.reason?.servers;
+    if (serverErrors instanceof Map) {
+      for (const [address, description] of serverErrors.entries()) {
+        const detail = description?.error?.message || description?.type;
+        console.error(`${address} -> ${detail}`);
+      }
+    }
+
+    process.exit(1);
+  }
+}
+
+startServer();

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "db:check": "node scripts/check-db.js",
+    "db:fill-product-names": "node scripts/fill-product-names.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
